@@ -1,0 +1,272 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+.ui-timerAxis-item {
+    margin-top: 20px;
+    width: 700px;
+    height: 30px;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.ui-timerAxis-item * {
+    box-sizing: border-box;
+}
+
+.ui-timerAxis-slider {
+    position: absolute;
+    height: 28px;
+    background-color: #50b85c;
+    cursor: move;
+}
+
+.ui-timerAxis-e-resize,
+.ui-timerAxis-w-resize {
+    position: absolute;
+    width: 5px;
+    height: 100%;
+}
+
+.ui-timerAxis-e-resize {
+    right: 0px;
+    cursor: e-resize;
+}
+
+.ui-timerAxis-w-resize {
+    left: 0px;
+    cursor: w-resize;
+}
+/* 这里是为了让拉伸的范围扩大，不会丢失鼠标 */
+.ui-timerAxis-e-resize::before,
+.ui-timerAxis-w-resize::before{
+    z-index: 10000;
+    content:'';
+    width:24px;
+    height:100%;
+    position:absolute;
+}
+.ui-timerAxis-e-resize::before {
+    left: -12px;
+}
+
+.ui-timerAxis-w-resize::before {
+    right: -12px;
+}
+
+.ui-timerAxis-slider-showL-time,
+.ui-timerAxis-slider-showR-time {
+    display: none;
+    font-style: normal;
+    position: absolute;
+    bottom: 100%;
+    padding: 4px;
+    font-size: 12px;
+    line-height: 12px;
+    color: #fff;
+    background-color: #333;
+}
+
+.ui-timerAxis-slider-showL-time {
+    left: 0;
+    transform: translateX(-50%);
+}
+
+.ui-timerAxis-slider-showR-time {
+    right: 0;
+    transform: translateX(50%);
+}
+
+.ui-timerAxis-slider-active {
+    background-color: yellowgreen;
+}
+
+.ui-timerAxis-slider-active::before,
+.ui-timerAxis-slider-active::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: yellow;
+}
+
+.ui-timerAxis-slider-active::before {
+    top: -1px;
+}
+
+.ui-timerAxis-slider-active::after {
+    bottom: -1px;
+}
+
+.ui-timerAxis-slider-active .ui-timerAxis-slider-showL-time,
+.ui-timerAxis-slider-active .ui-timerAxis-slider-showR-time {
+    display:block;
+}
+
+.ui-timerAxis-track {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #ccc;
+    left: 0;
+    cursor: pointer;
+    position:absolute;
+}
+
+.ui-timerAxis-scale {
+    width: 100%;
+    position: absolute;
+    left: 0;
+    top: -20px;
+    height: 20px;
+}
+
+.ui-timerAxis-scale-line,
+.ui-timerAxis-scale-num {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.ui-timerAxis-scale::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background-color: #ccc;
+    bottom: 100%;
+}
+
+.ui-timerAxis-scale-minutes {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 5px;
+    background-color: #ccc;
+}
+
+.ui-timerAxis-scale-hours {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 20px;
+    background-color: #ccc;
+}
+
+.ui-timerAxis-scale-num-item {
+    position: absolute;
+    bottom: 0;
+    font-size: 12px;
+    line-height: 18px;
+    transform: scale(0.9, 1);
+    font-style: normal;
+    user-select: none;
+}
+
+.box2 {
+    /* border: 1px solid #c00; */
+}
+
+.item {
+    width: 200px;
+    height: 200px;
+    margin: 50px;
+    border: 1px solid #c00;
+}
+
+.btn {
+    width: 40px;
+    margin: 10px;
+    border: 10px solid #c00;
+}
+.ui-timerAxis-control-box{
+    position: fixed;
+    width: 166px;
+    height: 84px;
+    padding: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+}
+.ui-timerAxis-control-box::after{
+    position: absolute;
+    content: '';
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: -16px;
+    border-top: 16px solid #ccc;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+}
+.ui-timerAxis-control-timeSet{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+.ui-timerAxis-control-timeSet span{
+    height:20px;
+    line-height: 20px;
+}
+.ui-timerAxis-control-inputL,
+.ui-timerAxis-control-inputR{
+    width: 60px;
+    height: 20px;
+    line-height: 20px;
+    border: 1px solid #ccc;
+    text-align: center;
+    font-size: 14px;
+    border-radius: 2px;
+}
+.ui-timerAxis-control-operate{
+    margin-top:10px;
+    padding:0 18px;
+}
+.ui-timerAxis-control-operate button{
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    background: none;
+    padding: 1px 2px;
+    line-height: 14px;
+    margin-right: 2px;
+    font-size: 14px;
+}
+.ui-timerAxis-control-operate button:focus{
+    outline: none;
+}
+.ui-timerAxis-control-operate .ui-timerAxis-control-delete{
+    color: #fff;
+    background-color: #f0ad4e;
+    border-color: #eea236;
+}
+.ui-timerAxis-control-operate .ui-timerAxis-control-comfirm{
+    color: #fff;
+    background-color: #5cb85c;
+    border-color: #4cae4c;
+}
+.ui-timerAxis-control-close{
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    line-height: 12px;
+    color: #ccc;
+    cursor: pointer;
+}
+.layui-laydate-content>.layui-laydate-list {
+    padding-bottom: 0px;
+    overflow: hidden;
+}
+.layui-laydate-content>.layui-laydate-list>li{
+    width:50%
+}
+/* 修改laydate */
+.merge-box .scrollbox .merge-list {
+    padding-bottom: 5px;
+} 
+.laydate-time-list > li:nth-child(3) {
+    display: none !important;
+}
+.layui-laydate-main {
+    width: 260px !important;
+}
