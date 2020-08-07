@@ -187,6 +187,7 @@
     padding: 4px;
     border: 1px solid #ccc;
     background: #fff;
+    z-index: 10000000;
 }
 .ui-timerAxis-control-box::after{
     position: absolute;
@@ -232,7 +233,8 @@
     margin-right: 2px;
     font-size: 14px;
 }
-.ui-timerAxis-control-operate button:focus{
+.ui-timerAxis-control-operate button:focus,
+.ui-timerAxis-control-timeSet input:focus{
     outline: none;
 }
 .ui-timerAxis-control-operate .ui-timerAxis-control-delete{

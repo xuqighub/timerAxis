@@ -1,4 +1,4 @@
-(function(){
+
     //拖拽类和创建slider类共用的数据操作
     class TimeArrData{
         constructor(){
@@ -685,13 +685,12 @@
         let div = document.createElement('div');
         div.innerHTML = temp;
         document.body.appendChild(div.firstElementChild);
-        //关于
-        controlEvent();
+        
         return true;
     }
 
-    //关于事件控件controler 的事件处理
-    function controlEvent(){
+    //关于事件控件controler 的事件处理,timerAxisObj是timerAxis对象
+    function controlEvent(timerAxisObj){
         //阻止时间冒泡到track 或document上
         let controlBox = document.querySelector('.ui-timerAxis-control-box');
         //关闭按钮
@@ -711,8 +710,8 @@
         }
         //点击删除按钮
         btndel.onclick = function(){
-            let target = document.querySelector('.ui-timerAxis-slider-active');
-            target && timerAxis.deleteTime(target);
+            let target = timerAxisObj.track.querySelector('.ui-timerAxis-slider-active');
+            target && timerAxisObj.deleteTime(target);
             controlBox.style.display = 'none';
         }
         //点击确定按钮
@@ -727,7 +726,7 @@
             }
 
             //时间是否设置成功返回
-            if(timerAxis.setTime(timeArr)){
+            if(timerAxisObj.setTime(timeArr).status){
                 //设置成功就关闭时间控件
                 controlBox.style.display = 'none';
             }
@@ -755,8 +754,6 @@
         }catch(e){
             console.warn(e.message);
         }
-        
-        
     }
 
     //创建生成时间控件的单例
@@ -767,8 +764,8 @@
         let showLTime = slider.querySelector('.ui-timerAxis-slider-showL-time');
         let showRTime = slider.querySelector('.ui-timerAxis-slider-showR-time');
         let max = pubData.getMax();
-        let LTime = timerAxis.pxToTime(pxArr[0],max);
-        let RTime = timerAxis.pxToTime(pxArr[1],max);;
+        let LTime = pxToTime(pxArr[0],max);
+        let RTime = pxToTime(pxArr[1],max);;
         showLTime.textContent = LTime;
         showRTime.textContent = RTime;
     }
@@ -780,10 +777,21 @@
         return time/(24*60/boxWidth);
     }
 
+    //把对应的px转为时间 12:08 格式
+    function pxToTime(px,boxWidth){
+        let total = Math.round(24/boxWidth*px*100)/100 + '';
+        let hour = total.split('.')[0];
+        let minutes = Math.round(('0.' + total.split('.')[1])*60);
+        minutes = minutes ? minutes+'' : '0';
+        return hour.padStart(2,'0') + ':' + minutes.padStart(2,'0');
+    }
+
     //显示时间设置的controler
-    function showtimeControl(slider,pxArr,timeArr){
+    function showtimeControl(slider,pxArr,timeArr,timerAxisObj){
         //创建单例
         singleControl(timeArr);
+        //关于timerControl的事件，删除和设置时间
+        controlEvent(timerAxisObj);
         //给控件定位
         let timerAxisEl = slider.parentNode;
         let controlBox = document.querySelector('.ui-timerAxis-control-box');
@@ -795,274 +803,320 @@
         controlBox.querySelector('.ui-timerAxis-control-inputR').value = timeArr[1].split(':').join(' : ');
     }
 
-  
+    //timerAxis类
+    class TimerAxis{
+        constructor({box,minuteScale,hourScale,timeCallback:callback,mouseupCallback,setTimeCallback}){
+            //生成时间轴的结构
+            this.track = this.createAxisStruct(box);
+            let track = this.track;
 
-    //暴露给window的接口方法
-    var timerAxis = {};
-    timerAxis.createAxis = function({box,minuteScale,hourScale,timeCallback:callback,mouseupCallback,setTimeCallback}){
-        let item = document.createElement('div');
-        let scale = document.createElement('div');
-        let track = document.createElement('div');
-        let scaleLine = document.createElement('div');
-        let scaleNum = document.createElement('div');
-        item.className = 'ui-timerAxis-item';
-        scale.className = 'ui-timerAxis-scale';
-        track.className = 'ui-timerAxis-track';
-        scaleLine.className = 'ui-timerAxis-scale-line';
-        scaleNum.className = 'ui-timerAxis-scale-num';
-        item.style.width = box.offsetWidth  + 'px';
-        scale.style.width = box.offsetWidth + 'px';
-        scale.appendChild(scaleLine);
-        scale.appendChild(scaleNum);
-        item.appendChild(scale);
-        item.appendChild(track);
-        box.appendChild(item);
-        this.trackBox = track;
+            //这是mousemoving过程中对时间进行处理在callback上再封装一层
+            callback = callback ? this._callback(box.offsetWidth-2,callback) : undefined;
+            //鼠标抬起的回调
+            mouseupCallback = mouseupCallback ? this._mouseupCallback(box.offsetWidth-2,mouseupCallback) : undefined;
+            //设置时间的回调
+            this.setTimeCallback = setTimeCallback;
+
+            //记录公共数据
+            this.pubData = new TimeArrData();
+            //创建 创建slider的对象
+            new CreateSlider(track,this.pubData,callback,mouseupCallback);
+            //创建拖拽对象
+            new DragSlider(track,this.pubData,callback,mouseupCallback);
+            //创建拉伸对象
+            new StretchSlider(track,this.pubData,callback,mouseupCallback);
+
+            //点击track外面取消掉slider 的active 状态
+            track.addEventListener('click',(ev)=>ev.stopPropagation());
+            document.addEventListener('click',function(ev){
+                [...track.children].forEach(el=>el.classList.remove('ui-timerAxis-slider-active'));
+                let controlBox = document.querySelector('.ui-timerAxis-control-box');
+                controlBox &&  (controlBox.style.display = 'none');
+            });
+
+            //双击slider 显示时间控件
+            track.addEventListener('dblclick',ev=>{
+                let target = ev.target;
+                if(!target.classList.contains('ui-timerAxis-slider')){
+                    return false;
+                }
+                let symbol = target.dataset.symbol;
+                let pxArr = this.pubData.getMap(symbol);
+                let max = this.pubData.getMax();
+                let timeArr = [pxToTime(pxArr[0],max),pxToTime(pxArr[1],max)];
+                //显示时间控件
+                showtimeControl(target,pxArr,timeArr,this);
+            });
+        }
+
+        //生成时间轴的结构
+        createAxisStruct = (box)=>{
+            //每个条目
+            let item = document.createElement('div');
+            item.className = 'ui-timerAxis-item';
+            item.style.width = box.offsetWidth  + 'px';
+            //刻度尺
+            let scale = document.createElement('div');
+            scale.className = 'ui-timerAxis-scale';
+            scale.style.width = box.offsetWidth + 'px';
+            //时间轴轨道
+            let track = document.createElement('div');
+            track.className = 'ui-timerAxis-track';
+            //刻度尺线条
+            let scaleLine = document.createElement('div');
+            scaleLine.className = 'ui-timerAxis-scale-line';
+            //刻度尺数值
+            let scaleNum = document.createElement('div');
+            scaleNum.className = 'ui-timerAxis-scale-num';
+            //轨道中加入刻度尺线条和数值
+            scale.appendChild(scaleLine);
+            scale.appendChild(scaleNum);
+            //将轨道和刻度尺放入条目中
+            item.appendChild(scale);
+            item.appendChild(track);
+            //将生成的item机构放入目标盒子中
+            box.appendChild(item);
+
+            //创建时间刻度和时间数字刻度
+            createTimerScaleLine(scaleLine);
+            createTimerScaleNum(scaleNum);
+
+            //返回track
+            return track;
+        }
+
+        //获取所有slider的map px，没有顺序
+        getSliderMap = () =>{
+            return this.pubData.getMap();
+        }
+
+        //获取所有slider对应的arr px,从小到大的排序
+        getSliderArr = () =>{
+            let endArr = this.pubData.getEndArr();
+            return this.pubData.getHeadArr().map((item,index)=>{
+                return [item,endArr[index]];
+            })
+        }
+
+        //获取所有slider对应的arr,并且是转换成时间 08:09 格式,从小到大的排序
+        getSliderArrTime = () =>{
+            let endArr = this.pubData.getEndArr();
+            return this.pubData.getHeadArr().map((item,index)=>{
+                return [pxToTime(item,this.pubData.getMax()),pxToTime(endArr[index],this.pubData.getMax())];
+            })
+        }
 
         //这是mousemoving过程中对时间进行处理在callback上再封装一层
-        callback = callback ? this._callback(box.offsetWidth-2,callback) : undefined;
-        //鼠标抬起的回调
-        mouseupCallback = mouseupCallback ? this._mouseupCallback(box.offsetWidth-2,mouseupCallback) : undefined;
-        //设置时间的回调
-        this.setTimeCallback = setTimeCallback;
-
-        //记录公共数据
-        this.pubData = new TimeArrData();
-        
-        //创建 创建slider的对象
-        new CreateSlider(track,this.pubData,callback,mouseupCallback);
-        //创建拖拽对象
-        new DragSlider(track,this.pubData,callback,mouseupCallback);
-        //创建时间刻度和时间数字刻度
-        createTimerScaleLine(scaleLine,minuteScale,hourScale);
-        createTimerScaleNum(scaleNum);
-        //创建拉伸对象
-        new StretchSlider(track,this.pubData,callback,mouseupCallback);
-
-        //点击track外面取消掉slider 的active 状态
-        track.addEventListener('click',(ev)=>ev.stopPropagation());
-        document.addEventListener('click',function(ev){
-            [...track.children].forEach(el=>el.classList.remove('ui-timerAxis-slider-active'));
-            let controlBox = document.querySelector('.ui-timerAxis-control-box');
-            controlBox &&  (controlBox.style.display = 'none');
-        });
-
-        //双击slider 显示时间控件
-        track.addEventListener('dblclick',ev=>{
-            let target = ev.target;
-            if(!target.classList.contains('ui-timerAxis-slider')){
-                return false;
+        _callback = (boxWidth,callback)=>{
+            return function(pxArr){
+                let pxToMinutesArr = [(24*60/boxWidth)*pxArr[0],(24*60/boxWidth)*pxArr[1]];
+                let minutesArr = callback(pxToMinutesArr);
+                let minutesToPxArr = Array.isArray(minutesArr) ? [minutesArr[0]/(24*60/boxWidth),minutesArr[1]/(24*60/boxWidth)] : undefined;
+                //console.log(minutesToPxArr,'mmmm');
+                return minutesToPxArr;
             }
-            let symbol = target.dataset.symbol;
-            let pxArr = this.pubData.getMap(symbol);
-            let max = this.pubData.getMax();
-            let timeArr = [this.pxToTime(pxArr[0],max),this.pxToTime(pxArr[1],max)];
-            //显示时间控件
-            showtimeControl(target,pxArr,timeArr);
-        });
-    }
-    //获取所有slider的map px，没有顺序
-    timerAxis.getSliderMap = function(){
-        return this.pubData.getMap();
-    }
-    //获取所有slider对应的arr px,从小到大的排序
-    timerAxis.getSliderArr = function(){
-        let endArr = this.pubData.getEndArr();
-        return this.pubData.getHeadArr().map((item,index)=>{
-            return [item,endArr[index]];
-        })
-    }
-    //获取所有slider对应的arr,并且是转换成时间 08:09 格式,从小到大的排序
-    timerAxis.getSliderArrTime = function(){
-        let endArr = this.pubData.getEndArr();
-        return this.pubData.getHeadArr().map((item,index)=>{
-            return [this.pxToTime(item,this.pubData.getMax()),this.pxToTime(endArr[index],this.pubData.getMax())];
-        })
-    }
-
-    //把对应的px转为时间 12:08 格式
-    timerAxis.pxToTime = function(px,boxWidth){
-        let total = Math.round(24/boxWidth*px*100)/100 + '';
-        let hour = total.split('.')[0];
-        let minutes = Math.round(('0.' + total.split('.')[1])*60);
-        minutes = minutes ? minutes+'' : '0';
-        return hour.padStart(2,'0') + ':' + minutes.padStart(2,'0');
-    }
-    //这是mousemoving过程中对时间进行处理在callback上再封装一层
-    timerAxis._callback = function(boxWidth,callback){
-        return function(pxArr){
-            let pxToMinutesArr = [(24*60/boxWidth)*pxArr[0],(24*60/boxWidth)*pxArr[1]];
-            let minutesArr = callback(pxToMinutesArr);
-            let minutesToPxArr = Array.isArray(minutesArr) ? [minutesArr[0]/(24*60/boxWidth),minutesArr[1]/(24*60/boxWidth)] : undefined;
-            //console.log(minutesToPxArr,'mmmm');
-            return minutesToPxArr;
         }
-    }
 
-    //鼠标抬起的时候做的操作，返回给callback 时间数组
-    timerAxis._mouseupCallback = function(boxWidth,mouseupCallback){
-        let _this = this;
-        return function(arr){
-            //console.log(boxWidth,'boxW');
-            let timeArr = [_this.pxToTime(arr[0],boxWidth),_this.pxToTime(arr[1],boxWidth)];
-            //showtimeControl(arr,timeArr,_this.trackBox);
-            mouseupCallback(timeArr);
+        //鼠标抬起的时候做的操作，返回给callback 时间数组
+        _mouseupCallback = (boxWidth,mouseupCallback)=>{
+            let _this = this;
+            return function(arr){
+                //console.log(boxWidth,'boxW');
+                let timeArr = [pxToTime(arr[0],boxWidth),pxToTime(arr[1],boxWidth)];
+                //showtimeControl(arr,timeArr,_this.trackBox);
+                mouseupCallback(timeArr);
+            }
         }
-    }
 
-    //根据给定的时间生成对应的时间轴，如果成功（在范围内）返回true,否则返回false
-    timerAxis.setTime = function(timeArr){
-        let {pubData} = this;
-        let max = pubData.getMax();
-        let pxArr = [timeToPx(timeArr[0],max),timeToPx(timeArr[1],max)];
-        //先删除之前的active slider之后再创建一个slider
-        let activeSlider = document.querySelector('.ui-timerAxis-slider-active');
-        //如果时间不正确返回false
-        let res = isCorrectSlider(pubData,pxArr,activeSlider);
-        if(!res.status){
-            //设置时间失败的回调
+        //根据给定的时间生成对应的时间轴，如果成功（在范围内）返回true,否则返回false
+        setTime = (timeArr)=>{
+            let {pubData} = this;
+            let max = pubData.getMax();
+            let pxArr = [timeToPx(timeArr[0],max),timeToPx(timeArr[1],max)];
+            //先删除之前的active slider之后再创建一个slider
+            let activeSlider = this.track.querySelector('.ui-timerAxis-slider-active');
+            //如果时间不正确返回false
+            let res = isCorrectSlider(pubData,pxArr,activeSlider);
+            if(!res.status){
+                //设置时间失败的回调
+                this.setTimeCallback && this.setTimeCallback(res);
+
+                //设置失败返回false
+                return res;
+            }
+            //先删除之前的active slider之后再创建一个slider
+            activeSlider && this.deleteTime(activeSlider);
+            
+            //创建slider以及记录数据
+            createSlider(this.track,pxArr,pubData);
+
+            //设置时间成功的回调
             this.setTimeCallback && this.setTimeCallback(res);
 
-            //设置失败返回false
+            //设置成功返回true
             return res;
-        }
-         //先删除之前的active slider之后再创建一个slider
-        activeSlider && this.deleteTime(activeSlider);
-        
-        //创建slider以及记录数据
-        createSlider(this.trackBox,pxArr,pubData);
 
-        //设置时间成功的回调
-        this.setTimeCallback && this.setTimeCallback(res);
+            //创建slider以及记录数据
+            function createSlider(box,pxArr,pubData){
+                let slider = document.createElement('div');
+                slider.className = 'ui-timerAxis-slider ui-timerAxis-slider-active';
+                //slider里面的结构，用于显示时间和拉伸作用
+                let innerHTML = `
+                    <i class="ui-timerAxis-e-resize"></i>
+                    <i class="ui-timerAxis-w-resize"></i>
+                    <i class="ui-timerAxis-slider-showL-time">00:00</i>
+                    <i class="ui-timerAxis-slider-showR-time">00:00</i>
+                `;
+                slider.innerHTML = innerHTML;
 
-        //设置成功返回true
-        return res;
+                slider.style.left = pxArr[0] + 'px';
+                slider.style.width = pxArr[1] - pxArr[0] + 'px';
+                slider.style.zIndex = pubData.getzIndex() + 10;
+                //移除已有元素的 激活类
+                [...box.children].forEach(el=>el.classList.remove('ui-timerAxis-slider-active'));
+                //插入元素
+                box.appendChild(slider);
 
-        //创建slider以及记录数据
-        function createSlider(box,pxArr,pubData){
-            let slider = document.createElement('div');
-            slider.className = 'ui-timerAxis-slider ui-timerAxis-slider-active';
-            //slider里面的结构，用于显示时间和拉伸作用
-            let innerHTML = `
-                <i class="ui-timerAxis-e-resize"></i>
-                <i class="ui-timerAxis-w-resize"></i>
-                <i class="ui-timerAxis-slider-showL-time">00:00</i>
-                <i class="ui-timerAxis-slider-showR-time">00:00</i>
-            `;
-            slider.innerHTML = innerHTML;
+                showLRTime(slider,pxArr,pubData);
 
-            slider.style.left = pxArr[0] + 'px';
-            slider.style.width = pxArr[1] - pxArr[0] + 'px';
-            slider.style.zIndex = pubData.getzIndex() + 10;
-            //移除已有元素的 激活类
-            [...box.children].forEach(el=>el.classList.remove('ui-timerAxis-slider-active'));
-            //插入元素
-            box.appendChild(slider);
-
-            showLRTime(slider,pxArr,pubData);
-
-            //给每个 slider 一个symbol值
-            let symbol = Date.now() + '';
-            slider.dataset.symbol = symbol;
-            let headTimeArr = pubData.getHeadArr(),
-                endTimeArr = pubData.getEndArr();
-            //记录数据
-            pubData.setHeadArr([...headTimeArr,pxArr[0]].sort((a,b)=>a-b));
-            pubData.setEndArr([...endTimeArr,pxArr[1]].sort((a,b)=>a-b));
-            pubData.setMap(symbol,[...pxArr]);
-            pubData.setzIndex();
-        }
-
-        //判断这个时间是否合法
-        function isCorrectSlider(pubData,pxArr,activeSlider){
-            let max = pubData.getMax();
-            let min = pubData.getMin();
-            if(pxArr[0] < min || pxArr[1] > max || pxArr[0] >= pxArr[1] || pxArr[1]-pxArr[0]<=20){
-                console.log('111111111',pxArr,headTimeArr,endTimeArr);
-                return {status:false,msg:'非法时间段'};
+                //给每个 slider 一个symbol值
+                let symbol = Date.now() + '';
+                slider.dataset.symbol = symbol;
+                let headTimeArr = pubData.getHeadArr(),
+                    endTimeArr = pubData.getEndArr();
+                //记录数据
+                pubData.setHeadArr([...headTimeArr,pxArr[0]].sort((a,b)=>a-b));
+                pubData.setEndArr([...endTimeArr,pxArr[1]].sort((a,b)=>a-b));
+                pubData.setMap(symbol,[...pxArr]);
+                pubData.setzIndex();
             }
-            let headTimeArr = pubData.getHeadArr();
-            let endTimeArr = pubData.getEndArr();
-            //active slider 存在时，需要先将包含这个slider的时间pxArr从判断数组中去除
-            if(activeSlider){
-                let index = 0;
-                let symbol = activeSlider.dataset.symbol;
-                let sliderPxArr = pubData.getMap(symbol);
-                //设置的值和之前的值没变化则不继续进行
-                if(pxArr[0]===sliderPxArr[0] && pxArr[1]===sliderPxArr[1]){
-                    console.log('2222222222',pxArr,headTimeArr,endTimeArr);
-                    return {status:false,msg:'该时间已存在，请勿重复创建！'};
+
+            //判断这个时间是否合法
+            function isCorrectSlider(pubData,pxArr,activeSlider){
+                let max = pubData.getMax();
+                let min = pubData.getMin();
+                if(pxArr[0] < min || pxArr[1] > max || pxArr[0] >= pxArr[1] || pxArr[1]-pxArr[0]<=20){
+                    console.log('111111111',pxArr,headTimeArr,endTimeArr);
+                    return {status:false,msg:'非法时间段'};
                 }
-                //找到对应的位置
-                for(let i=0;i<headTimeArr.length;i++){
-                    if(sliderPxArr[0] === headTimeArr[i]){
-                        index = i;
-                        break;
+                let headTimeArr = pubData.getHeadArr();
+                let endTimeArr = pubData.getEndArr();
+                //active slider 存在时，需要先将包含这个slider的时间pxArr从判断数组中去除
+                if(activeSlider){
+                    let index = 0;
+                    let symbol = activeSlider.dataset.symbol;
+                    let sliderPxArr = pubData.getMap(symbol);
+                    //设置的值和之前的值没变化则不继续进行
+                    if(pxArr[0]===sliderPxArr[0] && pxArr[1]===sliderPxArr[1]){
+                        console.log('2222222222',pxArr,headTimeArr,endTimeArr);
+                        return {status:false,msg:'该时间已存在，请勿重复创建！'};
                     }
-                    
+                    //找到对应的位置
+                    for(let i=0;i<headTimeArr.length;i++){
+                        if(sliderPxArr[0] === headTimeArr[i]){
+                            index = i;
+                            break;
+                        }
+                        
+                    }
+                    headTimeArr.splice(index,1);
+                    endTimeArr.splice(index,1);
                 }
-                headTimeArr.splice(index,1);
-                endTimeArr.splice(index,1);
-            }
-            //没有的时候，可以随意创建
-            if(headTimeArr.length === 0){
-                console.log('3333333333',pxArr,headTimeArr,endTimeArr);
-                return {status:true,msg:'创建成功'};
-            }
-            //在所有元素前面
-            if(pxArr[1]<=headTimeArr[0] && pxArr[0]>=min){
-                console.log('444444444444',pxArr,headTimeArr,endTimeArr);
-                return {status:true,msg:'创建成功'};
-            }
-            //在所有元素后面
-            if(pxArr[0]>=endTimeArr[endTimeArr.length-1] && pxArr[1]<=max){
-                console.log('55555555555',pxArr,headTimeArr,endTimeArr);
-                return {status:true,msg:'创建成功'};
-            }
-
-            //如果在中间则需要两个都在间隙中
-            for(let i=0;i<headTimeArr.length;i++){
-                if(pxArr[0]>=endTimeArr[i] && pxArr[0]<=headTimeArr[i+1]){
-                    console.log('66666666666',pxArr,headTimeArr,endTimeArr);
+                //没有的时候，可以随意创建
+                if(headTimeArr.length === 0){
+                    console.log('3333333333',pxArr,headTimeArr,endTimeArr);
                     return {status:true,msg:'创建成功'};
                 }
+                //在所有元素前面
+                if(pxArr[1]<=headTimeArr[0] && pxArr[0]>=min){
+                    console.log('444444444444',pxArr,headTimeArr,endTimeArr);
+                    return {status:true,msg:'创建成功'};
+                }
+                //在所有元素后面
+                if(pxArr[0]>=endTimeArr[endTimeArr.length-1] && pxArr[1]<=max){
+                    console.log('55555555555',pxArr,headTimeArr,endTimeArr);
+                    return {status:true,msg:'创建成功'};
+                }
+
+                //如果在中间则需要两个都在间隙中
+                for(let i=0;i<headTimeArr.length;i++){
+                    if(pxArr[0]>=endTimeArr[i] && pxArr[1]<=headTimeArr[i+1]){
+                        console.log('66666666666',pxArr,headTimeArr,endTimeArr,i);
+                        return {status:true,msg:'创建成功'};
+                    }
+                }
+                console.log('77777777777',pxArr,headTimeArr,endTimeArr);
+                return {status:false,msg:'非法时间段'};
             }
-            console.log('77777777777',pxArr,headTimeArr,endTimeArr);
-            return {status:false,msg:'非法时间段'};
+
         }
 
-    }
-
-    //删除某一个时间值，从pubData里面删除，并且删除对应的slider,传入要删除的slider
-    timerAxis.deleteTime = function(slider){
-        let symbol = slider.dataset.symbol;
-        let pubData = this.pubData;
-        let pxArr = pubData.getMap(symbol);
-        let headArr = pubData.getHeadArr();
-        let endArr = pubData.getEndArr();
-        let index = 0;
-        //找到要删除的位置
-        for(let i=0;i<headArr.length;i++){
-            if(pxArr[0]===headArr[i]){
-                index = i;
-                break;
+        //删除某一个时间值，从pubData里面删除，并且删除对应的slider,传入要删除的slider
+        deleteTime = (slider)=>{
+            let symbol = slider.dataset.symbol;
+            let pubData = this.pubData;
+            let pxArr = pubData.getMap(symbol);
+            let headArr = pubData.getHeadArr();
+            let endArr = pubData.getEndArr();
+            let index = 0;
+            //找到要删除的位置
+            for(let i=0;i<headArr.length;i++){
+                if(pxArr[0]===headArr[i]){
+                    index = i;
+                    break;
+                }
             }
-        }
-        //删除headArr中的对应数据
-        headArr.splice(index,1);
-        //删除endArr中的对应数据
-        endArr.splice(index,1)
-        //存入记录数据
-        pubData.setHeadArr(headArr);
-        //存入记录数据
-        pubData.setEndArr(endArr);
-        //删除map中的数据
-        pubData.deleteMap(symbol);
+            //删除headArr中的对应数据
+            headArr.splice(index,1);
+            //删除endArr中的对应数据
+            endArr.splice(index,1)
+            //存入记录数据
+            pubData.setHeadArr(headArr);
+            //存入记录数据
+            pubData.setEndArr(endArr);
+            //删除map中的数据
+            pubData.deleteMap(symbol);
 
-        //删除对应的slider
-        slider.remove();
+            //删除对应的slider
+            slider.remove();
+        }
     }
 
+    var t1 = new TimerAxis({
+        //目标盒子，只要一个盒子就行，但是需要知道盒子的宽度
+        box:document.querySelector('.box2'),
+        //mousemove的callback 这里可以对时间进行限定，比如移动距离必须是30分钟的间隔，
+        //返回时间数组，需要return对时间的处理
+        timeCallback:function(arr){
+            let gap = 30;
+            return [Math.round(arr[0]/gap)*gap,Math.round(arr[1]/gap)*gap];
+        },
+        //鼠标抬起的回调，返回时间的数组
+        mouseupCallback:function(timeArr){
+            console.log(timeArr,'timeArr')
+        },
+        //设置时间的后的回调，比如通过时间的controler设置时间，成功返回true 否则返回false
+        setTimeCallback:function(res){
+            console.log('set time callback:',res);
+        }
+    });
+    var t2 = new TimerAxis({
+        //目标盒子，只要一个盒子就行，但是需要知道盒子的宽度
+        box:document.querySelector('.box2'),
+        //mousemove的callback 这里可以对时间进行限定，比如移动距离必须是30分钟的间隔，
+        //返回时间数组，需要return对时间的处理
+        timeCallback:function(arr){
+            let gap = 30;
+            return [Math.round(arr[0]/gap)*gap,Math.round(arr[1]/gap)*gap];
+        },
+        //鼠标抬起的回调，返回时间的数组
+        mouseupCallback:function(timeArr){
+            console.log(timeArr,'timeArr')
+        },
+        //设置时间的后的回调，比如通过时间的controler设置时间，成功返回true 否则返回false
+        setTimeCallback:function(res){
+            console.log('set time callback:',res);
+        }
+    });
     //将对象暴露到全局作用于下面
-    window.timerAxis = timerAxis;
-})()
+    //window.timerAxis = timerAxis;
