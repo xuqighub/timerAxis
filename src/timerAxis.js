@@ -1,4 +1,4 @@
-
+(function(){
     //拖拽类和创建slider类共用的数据操作
     class TimeArrData{
         constructor(){
@@ -805,7 +805,7 @@
 
     //timerAxis类
     class TimerAxis{
-        constructor({box,minuteScale,hourScale,timeCallback:callback,mouseupCallback,setTimeCallback}){
+        constructor({box,timeCallback:callback,mouseupCallback,setTimeCallback}){
             //生成时间轴的结构
             this.track = this.createAxisStruct(box);
             let track = this.track;
@@ -1082,41 +1082,12 @@
         }
     }
 
-    var t1 = new TimerAxis({
-        //目标盒子，只要一个盒子就行，但是需要知道盒子的宽度
-        box:document.querySelector('.box2'),
-        //mousemove的callback 这里可以对时间进行限定，比如移动距离必须是30分钟的间隔，
-        //返回时间数组，需要return对时间的处理
-        timeCallback:function(arr){
-            let gap = 30;
-            return [Math.round(arr[0]/gap)*gap,Math.round(arr[1]/gap)*gap];
-        },
-        //鼠标抬起的回调，返回时间的数组
-        mouseupCallback:function(timeArr){
-            console.log(timeArr,'timeArr')
-        },
-        //设置时间的后的回调，比如通过时间的controler设置时间，成功返回true 否则返回false
-        setTimeCallback:function(res){
-            console.log('set time callback:',res);
-        }
-    });
-    var t2 = new TimerAxis({
-        //目标盒子，只要一个盒子就行，但是需要知道盒子的宽度
-        box:document.querySelector('.box2'),
-        //mousemove的callback 这里可以对时间进行限定，比如移动距离必须是30分钟的间隔，
-        //返回时间数组，需要return对时间的处理
-        timeCallback:function(arr){
-            let gap = 30;
-            return [Math.round(arr[0]/gap)*gap,Math.round(arr[1]/gap)*gap];
-        },
-        //鼠标抬起的回调，返回时间的数组
-        mouseupCallback:function(timeArr){
-            console.log(timeArr,'timeArr')
-        },
-        //设置时间的后的回调，比如通过时间的controler设置时间，成功返回true 否则返回false
-        setTimeCallback:function(res){
-            console.log('set time callback:',res);
-        }
-    });
+    //timerAxis对象,用于对外提供调用方法
+    var timerAxis = {};
+    timerAxis.createAxis = function({box,timeCallback:callback,mouseupCallback,setTimeCallback}){
+        return new TimerAxis({box,timeCallback:callback,mouseupCallback,setTimeCallback});
+    }
+
     //将对象暴露到全局作用于下面
-    //window.timerAxis = timerAxis;
+    window.timerAxis = timerAxis;
+})()
